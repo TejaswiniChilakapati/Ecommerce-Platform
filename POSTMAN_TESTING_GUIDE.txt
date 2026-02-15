@@ -1,0 +1,161 @@
+# E-Commerce Platform - Postman Testing Guide
+
+================================================================================
+QUICK START
+================================================================================
+1. Start services → docker-compose up -d
+2. Get Keycloak token (see below)
+3. Use token in all API requests
+4. Test endpoints
+
+================================================================================
+KEYCLOAK AUTHENTICATION
+================================================================================
+Get Access Token:
+POST http://localhost:8080/realms/ecommerce/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+Body:
+  grant_type=password
+  client_id=backend-service
+  client_secret=ecommerce-secret-2024
+Response → copy "access_token"
+
+Use Token:
+Authorization: Bearer {{access_token}}
+
+================================================================================
+PRODUCT SERVICE (8082)
+================================================================================
+1. Create Product
+POST /api/products
+Auth: Bearer token
+body: { name, description, price }
+
+2. Get All Products
+GET /api/products
+Auth: Bearer token
+
+3. Get Product by ID
+GET /api/products/{id}
+Auth: Bearer token
+
+================================================================================
+INVENTORY SERVICE (8084)
+================================================================================
+4. Create Inventory
+POST /api/inventory
+Auth: Bearer token
+body: { productId, quantity }
+
+5. Get Inventory
+GET /api/inventory/{productId}
+Auth: Bearer token
+
+6. Check Stock
+GET /api/inventory/check?productId=...&quantity=...
+Auth: Bearer token
+
+7. Get All Inventory
+GET /api/inventory
+Auth: Bearer token
+
+================================================================================
+ORDER SERVICE (8083)
+================================================================================
+8. Create Order
+POST /api/orders
+Auth: Bearer token
+body: { lineItems: [ { productId, qty, price } ] }
+
+9. Get Order by ID
+GET /api/orders/{id}
+Auth: Bearer token
+
+10. Get All Orders
+GET /api/orders
+Auth: Bearer token
+
+11. Get Orders (Paged)
+GET /api/orders/paged?page=0&size=20
+Auth: Bearer token
+
+12. Update Order Status
+PATCH /api/orders/{id}/status?status=SHIPPED
+Auth: Bearer token
+
+13. Cancel Order
+DELETE /api/orders/{id}/cancel
+Auth: Bearer token
+note: only works if order is PENDING/CONFIRMED
+
+================================================================================
+TESTING SCENARIOS
+================================================================================
+Full Order Flow:
+1. Create product → save ID
+2. Create inventory (50 units)
+3. Place order (3 units)
+4. Track status every 20s:
+   0s PENDING
+   10s CONFIRMED
+   28s PROCESSING
+   48s SHIPPED
+   100s DELIVERED
+5. Inventory should be 47
+
+Out of Stock:
+- Inventory = 5, order = 10 → fails
+
+Payment Failure:
+- ~5% chance → order CANCELLED, inventory released
+
+Cancellation:
+- Cancel PENDING/CONFIRMED → success
+- Cancel SHIPPED → error
+
+================================================================================
+MONITORING
+================================================================================
+Eureka → http://localhost:8761 (eureka/eureka123)
+Keycloak → http://localhost:8080 (admin/admin)
+Zipkin → http://localhost:9411
+Prometheus → http://localhost:9090
+Grafana → http://localhost:3000 (admin/admin)
+
+================================================================================
+COMMON ISSUES
+================================================================================
+401 Unauthorized → token expired or missing
+Order stuck at PENDING → check Payment service + Kafka
+Order stuck at CONFIRMED → check Warehouse service
+Inventory not deducted → wait full 100s (deducts after DELIVERED)
+Service not in Eureka → wait 30–60s, check logs
+
+================================================================================
+QUICK REFERENCE
+================================================================================
+Ports:
+8080 Keycloak
+8081 API Gateway
+8082 Product
+8083 Order
+8084 Inventory
+8085 Notification
+8086 Payment
+8087 Warehouse
+8088 Shipping
+8089 Delivery
+8761 Eureka
+9411 Zipkin
+9090 Prometheus
+3000 Grafana
+
+Order Flow:
+PENDING → CONFIRMED → PROCESSING → SHIPPED → DELIVERED
+(~0s)     (~10s)      (~28s)       (~48s)    (~100s)
+
+Keycloak:
+Admin → admin/admin
+Client → backend-service
+Secret → ecommerce-secret-2024
+Realm → ecommerce

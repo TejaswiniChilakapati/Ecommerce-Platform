@@ -1,4 +1,4 @@
-# E‑Commerce Microservices Platform – Architecture
+# E‑Commerce Microservices Platform
 
 1. Overview
 -----------
